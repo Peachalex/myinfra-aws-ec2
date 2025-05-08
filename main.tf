@@ -2,7 +2,7 @@ terraform {
   required_version = ">=1.5"
   required_providers {
     aws = {
-      source = "hashicorp/aws"
+      source  = "hashicorp/aws"
       version = "~> 5.0"
     }
   }
@@ -18,8 +18,8 @@ resource "aws_vpc" "web" {
 }
 
 resource "aws_subnet" "subnet1" {
-  vpc_id = aws_vpc.web.id
-  cidr_block = "10.0.1.0/24"
+  vpc_id            = aws_vpc.web.id
+  cidr_block        = "10.0.1.0/24"
   availability_zone = var.availability_zones
 
   tags = {
@@ -28,40 +28,64 @@ resource "aws_subnet" "subnet1" {
   }
 }
 
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.web.id
 
+  tags = {
+    "Name" = "Main"
+  }
+}
+
+resource "aws_route_table" "rt1" {
+  vpc_id = aws_vpc.web.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
+  }
+
+  tags = {
+    Name = "Public"
+  }
+}
+
+resource "aws_route_table_association" "rta1" {
+  subnet_id = aws_subnet.subnet1.id
+  route_table_id = aws_route_table.rt1.id
+}
 
 resource "aws_security_group" "webserver" {
-  name = "webserver"
+  name        = "webserver"
   description = "Webserver network traffic"
-  vpc_id = aws_vpc.web.id
+  vpc_id      = aws_vpc.web.id
 
   ingress {
     description = "SSH form anywhere"
-    from_port = 22
-    to_port = 22
-    protocol = "tcp"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
   }
 
   ingress {
     description = "HTTP from anywhere"
-    from_port = 8080
-    to_port = 8080
-    protocol = "tcp"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
-    from_port = 0
-    to_port = 0
-    protocol = "-1"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
 resource "aws_instance" "webserver" {
-  ami           = var.amis[var.region]
-  instance_type = var.instance_type
-  subnet_id     = aws_subnet.subnet1.id
+  ami                    = var.amis[var.region]
+  instance_type          = var.instance_type
+  subnet_id              = aws_subnet.subnet1.id
   vpc_security_group_ids = [aws_security_group.webserver.id]
 
   associate_public_ip_address = true
